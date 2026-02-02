@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>commands - noobtube</title>
+  <meta name="description" content="all commands for noobtube discord music bot">
+  <meta name="author" content="olympictechbro">
+  <meta name="theme-color" content="#5865F2">
+  
+  <!-- open graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://noobtube.xyz/commands.html">
+  <meta property="og:title" content="noobtube commands">
+  <meta property="og:description" content="all commands for noobtube discord music bot">
+  <meta property="og:image" content="https://noobtube.xyz/2.png">
+  
+  <!-- twitter -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:url" content="https://noobtube.xyz/commands.html">
+  <meta name="twitter:title" content="noobtube commands">
+  <meta name="twitter:description" content="all commands for noobtube discord music bot">
+  <meta name="twitter:image" content="https://noobtube.xyz/2.png">
+  
+  <link rel="icon" type="image/png" href="2.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="commands-page">
+    <a href="index.html" class="logo-link">
+      <img src="2.png" alt="noobtube" class="logo">
+    </a>
+    <h1>Commands</h1>
+    
+    <div class="steps">
+      <h2>Getting Started</h2>
+      <div class="toggle-tabs">
+        <button class="toggle-btn active" data-tab="invite">Invite</button>
+        <button class="toggle-btn" data-tab="join">Join</button>
+        <button class="toggle-btn" data-tab="play">Play</button>
+      </div>
+      <div class="toggle-content">
+        <div class="tab-panel active" id="invite">
+          <h3>Invite the Bot</h3>
+          <p>Click the "Add to Discord" button on the homepage to add noobtube to your Discord server. Select the server you want and authorize the bot.</p>
+        </div>
+        <div class="tab-panel" id="join">
+          <h3>Join a Voice Channel</h3>
+          <p>Connect to any voice channel in your Discord server. The bot will join you when you play a song.</p>
+        </div>
+        <div class="tab-panel" id="play">
+          <h3>Play Music</h3>
+          <p>Use the command <code>/play [youtube url]</code> to start playing audio from YouTube in your voice channel.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="commands-intro">all commands use discord's slash command system. type <code>/</code> in any channel to see available commands.</p>
+
+    <div class="commands-list">
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/play</code>
+          <span class="command-usage">&lt;url&gt;</span>
+        </div>
+        <p class="command-desc">Play audio from a YouTube URL. The bot will join your voice channel and start playing.</p>
+        <div class="command-example">
+          <span class="example-label">Example:</span>
+          <code>/play https://youtube.com/watch?v=dQw4w9WgXcQ</code>
+        </div>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/pause</code>
+        </div>
+        <p class="command-desc">Pause the currently playing track. Use /resume to continue playback.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/resume</code>
+        </div>
+        <p class="command-desc">Resume playback after pausing.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/skip</code>
+        </div>
+        <p class="command-desc">Skip the current track and play the next song in the queue.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/queue</code>
+        </div>
+        <p class="command-desc">Display the current music queue, showing what's playing and what's up next.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/nowplaying</code>
+        </div>
+        <p class="command-desc">Show information about the currently playing track.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/stop</code>
+        </div>
+        <p class="command-desc">Stop playback completely and clear the entire queue.</p>
+      </div>
+
+      <div class="command-card">
+        <div class="command-header">
+          <code class="command-name">/leave</code>
+        </div>
+        <p class="command-desc">Make the bot leave the voice channel and disconnect.</p>
+      </div>
+    </div>
+  </main>
+
+  <section class="star-section">
+    <p>if you find this project useful, please consider starring it on github</p>
+    <a href="https://github.com/olympictechbro/noobtube" target="_blank" class="star-btn">
+      <svg viewBox="0 0 16 16" fill="currentColor">
+        <path d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z"/>
+      </svg>
+      star on github
+    </a>
+  </section>
+
+  <script src="script.js"></script>
+</body>
+</html>
