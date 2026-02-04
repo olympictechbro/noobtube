@@ -73,6 +73,15 @@ function findYtDlp() {
 }
 
 const ytdlpPath = findYtDlp();
+const fs = require('fs');
+
+// Cookie support for age-restricted videos
+let cookiesPath = null;
+if (process.env.YOUTUBE_COOKIES) {
+  cookiesPath = '/tmp/cookies.txt';
+  fs.writeFileSync(cookiesPath, process.env.YOUTUBE_COOKIES);
+  console.log('YouTube cookies loaded');
+}
 
 console.log('FFmpeg path:', ffmpegPath);
 console.log('yt-dlp path:', ytdlpPath);
@@ -97,6 +106,9 @@ const client = new Client({
 // Queue storage per guild
 const queues = new Map();
 
+// Inactivity timeouts per guild
+const inactivityTimeouts = new Map();
+
 // Get or create a queue for a guild
 function getQueue(guildId) {
   if (!queues.has(guildId)) {
@@ -112,9 +124,15 @@ function getQueue(guildId) {
       connection: null,
       currentSong: null,
       isPlaying: false,
+      startTime: null,
     });
   }
   return queues.get(guildId);
+}
+
+// Check if URL is a playlist
+function isPlaylistUrl(url) {
+  return url.includes('list=') && !url.includes('&index=');
 }
 
 // Get video info using yt-dlp
@@ -124,8 +142,9 @@ async function getVideoInfo(url) {
       '--dump-json',
       '--no-warnings',
       '--no-playlist',
-      url
     ];
+    
+    args.push(url);
     
     const proc = spawn(ytdlpPath, args);
     let stdout = '';
@@ -148,6 +167,48 @@ async function getVideoInfo(url) {
         }
       } else {
         reject(new Error(stderr || 'Failed to get video info'));
+      }
+    });
+    
+    proc.on('error', (err) => {
+      reject(err);
+    });
+  });
+}
+
+// Get playlist info using yt-dlp
+async function getPlaylistInfo(url) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--dump-json',
+      '--flat-playlist',
+      '--no-warnings',
+      url
+    ];
+    
+    const proc = spawn(ytdlpPath, args);
+    let stdout = '';
+    let stderr = '';
+    
+    proc.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+    
+    proc.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+    
+    proc.on('close', (code) => {
+      if (code === 0 && stdout) {
+        try {
+          // Each line is a separate JSON object
+          const videos = stdout.trim().split('\n').map(line => JSON.parse(line));
+          resolve(videos);
+        } catch (e) {
+          reject(new Error('Failed to parse playlist info'));
+        }
+      } else {
+        reject(new Error(stderr || 'Failed to get playlist info'));
       }
     });
     
@@ -206,6 +267,7 @@ async function playNext(guildId) {
   const song = queue.songs.shift();
   queue.currentSong = song;
   queue.isPlaying = true;
+  queue.startTime = Date.now();
 
   try {
     console.log('Playing:', song.title);
@@ -232,6 +294,32 @@ async function playNext(guildId) {
   }
 }
 
+// Clear inactivity timeout for a guild
+function clearInactivityTimeout(guildId) {
+  if (inactivityTimeouts.has(guildId)) {
+    clearTimeout(inactivityTimeouts.get(guildId));
+    inactivityTimeouts.delete(guildId);
+  }
+}
+
+// Start inactivity timeout - leave after 30 seconds of no music
+function startInactivityTimeout(guildId) {
+  clearInactivityTimeout(guildId);
+  
+  const timeout = setTimeout(() => {
+    const queue = getQueue(guildId);
+    if (queue.connection && !queue.isPlaying && queue.songs.length === 0) {
+      console.log('Leaving due to inactivity');
+      queue.connection.destroy();
+      queue.connection = null;
+      queue.currentSong = null;
+      inactivityTimeouts.delete(guildId);
+    }
+  }, 30000); // 30 seconds
+  
+  inactivityTimeouts.set(guildId, timeout);
+}
+
 // Setup player event handlers
 function setupPlayerEvents(guildId) {
   const queue = getQueue(guildId);
@@ -239,11 +327,17 @@ function setupPlayerEvents(guildId) {
 
   queue.player.on(AudioPlayerStatus.Idle, () => {
     console.log('Player idle');
-    playNext(guildId);
+    const hasMore = playNext(guildId);
+    if (!hasMore) {
+      // No more songs, start inactivity timer
+      startInactivityTimeout(guildId);
+    }
   });
 
   queue.player.on(AudioPlayerStatus.Playing, () => {
     console.log('Player: PLAYING');
+    // Clear inactivity timeout when playing
+    clearInactivityTimeout(guildId);
   });
 
   queue.player.on(AudioPlayerStatus.Buffering, () => {
@@ -256,9 +350,9 @@ function setupPlayerEvents(guildId) {
   });
 }
 
-// Validate YouTube URL
+// Validate YouTube URL (including playlists)
 function isValidYouTubeUrl(url) {
-  return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/)|youtu\.be\/)/.test(url);
+  return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|playlist\?list=)|youtu\.be\/)/.test(url);
 }
 
 // Format duration
@@ -268,12 +362,21 @@ function formatDuration(seconds) {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+// Create progress bar
+function createProgressBar(current, total, length = 15) {
+  const progress = Math.min(current / total, 1);
+  const filledLength = Math.round(length * progress);
+  const filled = '▓'.repeat(filledLength);
+  const empty = '░'.repeat(length - filledLength);
+  return `${filled}${empty}`;
+}
+
 // Slash commands
 const commands = [
   new SlashCommandBuilder()
     .setName('play')
-    .setDescription('Play YouTube audio')
-    .addStringOption(opt => opt.setName('url').setDescription('YouTube URL').setRequired(true)),
+    .setDescription('Play YouTube audio (supports playlists)')
+    .addStringOption(opt => opt.setName('url').setDescription('YouTube URL or playlist link').setRequired(true)),
   new SlashCommandBuilder().setName('pause').setDescription('Pause'),
   new SlashCommandBuilder().setName('resume').setDescription('Resume'),
   new SlashCommandBuilder().setName('skip').setDescription('Skip'),
@@ -327,6 +430,90 @@ client.on('interactionCreate', async (interaction) => {
         }
 
         try {
+          // Check if it's a playlist
+          if (isPlaylistUrl(url)) {
+            console.log('Playlist detected, fetching playlist info...');
+            const videos = await getPlaylistInfo(url);
+            console.log(`Found ${videos.length} videos in playlist`);
+            
+            if (videos.length === 0) {
+              return interaction.editReply('❌ No videos found in playlist');
+            }
+
+            // Join voice channel first if not connected
+            if (!queue.connection) {
+              console.log('Joining:', vc.name);
+              queue.connection = joinVoiceChannel({
+                channelId: vc.id,
+                guildId,
+                adapterCreator: interaction.guild.voiceAdapterCreator,
+              });
+
+              queue.connection.on('stateChange', (oldState, newState) => {
+                console.log(`Voice: ${oldState.status} -> ${newState.status}`);
+              });
+
+              queue.connection.on('error', (error) => {
+                console.error('Voice connection error:', error.message);
+              });
+
+              try {
+                await entersState(queue.connection, VoiceConnectionStatus.Ready, 30_000);
+                console.log('Connected!');
+              } catch (error) {
+                console.error('Connection timeout:', error.message);
+                queue.connection.destroy();
+                queue.connection = null;
+                return interaction.editReply('❌ Failed to join voice channel');
+              }
+
+              queue.connection.subscribe(queue.player);
+              setupPlayerEvents(guildId);
+
+              queue.connection.on(VoiceConnectionStatus.Disconnected, async () => {
+                try {
+                  await Promise.race([
+                    entersState(queue.connection, VoiceConnectionStatus.Signalling, 5000),
+                    entersState(queue.connection, VoiceConnectionStatus.Connecting, 5000),
+                  ]);
+                } catch {
+                  queue.connection?.destroy();
+                  queue.connection = null;
+                  queue.songs = [];
+                  queue.currentSong = null;
+                  queue.isPlaying = false;
+                }
+              });
+            }
+
+            // Add all videos to queue
+            const songs = videos.slice(0, 50).map(video => ({
+              url: `https://www.youtube.com/watch?v=${video.id}`,
+              title: video.title || 'Unknown',
+              duration: formatDuration(video.duration || 0),
+              durationSeconds: video.duration || 0,
+              thumbnail: video.thumbnail,
+              requestedBy: interaction.user.tag,
+            }));
+
+            queue.songs.push(...songs);
+            clearInactivityTimeout(guildId);
+
+            const embed = new EmbedBuilder()
+              .setColor(0x00ff00)
+              .setTitle('Playlist Added')
+              .setDescription(`Added **${songs.length}** songs to the queue`)
+              .addFields(
+                { name: 'First song', value: songs[0]?.title || 'Unknown', inline: true }
+              );
+
+            await interaction.editReply({ embeds: [embed] });
+
+            if (!queue.isPlaying) playNext(guildId);
+            break;
+          }
+
+          // Single video
           console.log('Calling getVideoInfo...');
           const startTime = Date.now();
           const info = await getVideoInfo(url);
@@ -336,6 +523,7 @@ client.on('interactionCreate', async (interaction) => {
             url,
             title: info.title || 'Unknown',
             duration: formatDuration(info.duration || 0),
+            durationSeconds: info.duration || 0,
             thumbnail: info.thumbnail,
             requestedBy: interaction.user.tag,
           };
@@ -392,6 +580,7 @@ client.on('interactionCreate', async (interaction) => {
           }
 
           queue.songs.push(song);
+          clearInactivityTimeout(guildId);
 
           const embed = new EmbedBuilder()
             .setColor(0x00ff00)
@@ -447,15 +636,23 @@ client.on('interactionCreate', async (interaction) => {
         break;
       }
 
-      case 'nowplaying':
+      case 'nowplaying': {
         if (!queue.currentSong) return interaction.reply({ content: '❌ Nothing playing', flags: 64 });
+        
+        const elapsed = queue.startTime ? Math.floor((Date.now() - queue.startTime) / 1000) : 0;
+        const total = queue.currentSong.durationSeconds || 0;
+        const progressBar = createProgressBar(elapsed, total);
+        const elapsedStr = formatDuration(elapsed);
+        const totalStr = queue.currentSong.duration;
+        
         await interaction.reply({
           embeds: [new EmbedBuilder()
             .setColor(0x0099ff)
-            .setTitle('🎵 Now Playing')
-            .setDescription(`**${queue.currentSong.title}**`)]
+            .setTitle('Now Playing')
+            .setDescription(`**${queue.currentSong.title}**\n\n${progressBar}\n${elapsedStr} / ${totalStr}`)]
         });
         break;
+      }
 
       case 'stop':
         queue.songs = [];
