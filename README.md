@@ -8,13 +8,16 @@ A simple Discord bot that plays YouTube audio in voice channels.
 
 ## Features
 
-- **Play** - Play YouTube videos (audio only) by URL
+- **Play** - Play YouTube videos (audio only) by URL or playlist link
+- **Playlist Support** - Add entire YouTube playlists to the queue
+- **Progress Bar** - See playback progress with `/nowplaying`
 - **Pause/Resume** - Pause and resume playback
 - **Skip** - Skip to the next song in queue
 - **Queue** - View the current music queue
-- **Now Playing** - See what's currently playing
+- **Now Playing** - See what's currently playing with progress
 - **Stop** - Stop playback and clear the queue
 - **Leave** - Make the bot leave the voice channel
+- **Auto-Leave** - Bot leaves after 30 seconds of inactivity
 
 ## Prerequisites
 
@@ -159,23 +162,29 @@ Commands registered
 
 | Command | Description |
 |---------|-------------|
-| `/play <url>` | Play a YouTube video by URL |
+| `/play <url>` | Play a YouTube video or playlist by URL |
 | `/pause` | Pause the current song |
 | `/resume` | Resume playback |
 | `/skip` | Skip to the next song |
 | `/queue` | Show the music queue |
-| `/nowplaying` | Show current song info |
+| `/nowplaying` | Show current song with progress bar |
 | `/stop` | Stop and clear queue |
 | `/leave` | Leave voice channel |
 
 ## Usage Examples
 
 ```
+# Play a single video
 /play https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+# Play an entire playlist
+/play https://www.youtube.com/watch?v=UWcBtHdPSKk&list=PL6ccGtegsmFKlNOHYC7bFYeR4zWPgeIvB
+
 /pause
 /resume
 /skip
 /queue
+/nowplaying
 ```
 
 ---
