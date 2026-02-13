@@ -355,6 +355,15 @@ function isValidYouTubeUrl(url) {
   return /^(https?:\/\/)?(www\.)?(youtube\.com\/(watch\?v=|shorts\/|playlist\?list=)|youtu\.be\/)/.test(url);
 }
 
+// Check if voice connection is valid and ready
+function isConnectionValid(queue) {
+  if (!queue.connection) return false;
+  const status = queue.connection.state.status;
+  return status === VoiceConnectionStatus.Ready || 
+         status === VoiceConnectionStatus.Signalling || 
+         status === VoiceConnectionStatus.Connecting;
+}
+
 // Format duration
 function formatDuration(seconds) {
   const mins = Math.floor(seconds / 60);
@@ -440,8 +449,13 @@ client.on('interactionCreate', async (interaction) => {
               return interaction.editReply('❌ No videos found in playlist');
             }
 
-            // Join voice channel first if not connected
-            if (!queue.connection) {
+            // Join voice channel first if not connected or connection is stale
+            if (!isConnectionValid(queue)) {
+              // Clean up old connection if exists
+              if (queue.connection) {
+                try { queue.connection.destroy(); } catch (e) {}
+                queue.connection = null;
+              }
               console.log('Joining:', vc.name);
               queue.connection = joinVoiceChannel({
                 channelId: vc.id,
@@ -484,6 +498,8 @@ client.on('interactionCreate', async (interaction) => {
                   queue.isPlaying = false;
                 }
               });
+            } else {
+              console.log('Reusing existing voice connection for playlist');
             }
 
             // Add all videos to queue
@@ -528,8 +544,13 @@ client.on('interactionCreate', async (interaction) => {
             requestedBy: interaction.user.tag,
           };
 
-          // Join voice channel
-          if (!queue.connection) {
+          // Join voice channel if not connected or connection is stale
+          if (!isConnectionValid(queue)) {
+            // Clean up old connection if exists
+            if (queue.connection) {
+              try { queue.connection.destroy(); } catch (e) {}
+              queue.connection = null;
+            }
             console.log('Joining:', vc.name);
             queue.connection = joinVoiceChannel({
               channelId: vc.id,
@@ -577,6 +598,8 @@ client.on('interactionCreate', async (interaction) => {
                 queue.isPlaying = false;
               }
             });
+          } else {
+            console.log('Reusing existing voice connection');
           }
 
           queue.songs.push(song);
